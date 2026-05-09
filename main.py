@@ -21,7 +21,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_BASE_URL = os.environ.get("ANTHROPIC_BASE_URL", "")
-INSTAGRAM = "https://instagram.com/capsula_volos"
+INSTAGRAM = "https://instagram.com/volos_capsula/"
 PHONE = os.environ.get("MASTER_PHONE", "+375291234567")
 CARD = os.environ.get("CARD_NUMBER", "0000 0000 0000 0000")
 
@@ -38,7 +38,7 @@ bookings: dict = {}      # {f"{date}_{time}": {"user_id":..,"name":..,"phone":..
 blocked_dates: set = {}  # {"2025-05-10", ...}
 warmup_queue: list = []  # [{"user_id":..,"stage":..,"send_at":..,"method":..}]
 
-AI_SYSTEM = f"""Ты — умный ассистент мастера по наращиванию волос Анны (@capsula_volos, Брест).
+AI_SYSTEM = f"""Ты — умный ассистент мастера по наращиванию волос Анны (@volos_capsula, Брест).
 Отвечаешь тепло, профессионально, по-русски. 2-4 предложения максимум.
 УСЛУГИ И ЦЕНЫ:
 - Горячее капсульное: 1.6 BYN/капсула + волосы (45см=729р, 50=760, 55=790, 60=853, 65=915, 70=961, 75=1054, 80=1116)
@@ -265,7 +265,7 @@ async def main():
         await message.answer(
             f"💜 Привет, <b>{name}</b>!\n\n"
             "Я — помощник мастера наращивания волос <b>Анны</b>\n"
-            "📍 Брест · @capsula_volos\n\n"
+            "📍 Брест · @volos_capsula\n\n"
             "✨ Подберу метод · 💰 Рассчитаю стоимость\n"
             "📅 Запишу · 🎁 Бесплатный гайд\n\n"
             "Выбирай 👇",
@@ -303,7 +303,7 @@ async def main():
     async def cb_contacts(cb: CallbackQuery):
         await cb.message.edit_text(
             f"📞 <b>Контакты</b>\n\n👩 Мастер: <b>Анна</b>\n📍 Брест\n"
-            f"📱 {PHONE}\n📸 @capsula_volos",
+            f"📱 {PHONE}\n📸 @volos_capsula",
             reply_markup=back_kb()
         )
         await cb.answer()
@@ -379,7 +379,7 @@ async def main():
         await cb.message.edit_text(
             "✅ <b>Оплата получена!</b>\n\n"
             "Анна проверит платёж и пришлёт материал в течение нескольких минут 💜\n\n"
-            "Если возникнут вопросы — напишите напрямую в Instagram @capsula_volos",
+            "Если возникнут вопросы — напишите напрямую в Instagram @volos_capsula",
             reply_markup=back_kb()
         )
         await cb.answer()
@@ -395,7 +395,7 @@ async def main():
         if not any(get_slots_for_date(d) for d in dates):
             await cb.message.edit_text(
                 "😔 К сожалению, свободных окон на ближайшие 2 недели нет.\n\n"
-                f"Напишите напрямую: {PHONE}\n📸 @capsula_volos",
+                f"Напишите напрямую: {PHONE}\n📸 @volos_capsula",
                 reply_markup=back_kb()
             )
             await cb.answer()
@@ -518,7 +518,7 @@ async def main():
             f"📅 {ds} в {t}\n"
             f"✨ {data['method']}\n\n"
             "Анна свяжется с тобой для подтверждения 💜\n\n"
-            "📸 Пока загляни в Instagram @capsula_volos",
+            "📸 Пока загляни в Instagram @volos_capsula",
             reply_markup=main_menu()
         )
         await cb.answer()
