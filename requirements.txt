@@ -1,1 +1,2 @@
 aiogram==3.13.1
+anthropic==0.34.2
