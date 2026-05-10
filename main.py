@@ -828,44 +828,30 @@ async def main():
         await cb.answer()
 
     @dp.callback_query(F.data.startswith("send_guide_"))
+    @dp.callback_query(F.data.startswith("send_guide_"))
     async def cb_send_guide(cb: CallbackQuery, bot: Bot):
         if cb.from_user.id != ADMIN_ID: return
         uid = int(cb.data.replace("send_guide_",""))
-        guide_text = (
-            "💎 <b>Гайд по уходу за нарощенными волосами</b>\n\n"
-            "Благодарю за покупку! 💜 Вот твой гайд:\n\n"
-            "<b>✅ Расчёсывание</b>\n"
-            "Расчёсывай только специальной щёткой для нарощенных снизу вверх. "
-            "Никогда не тяни от корней!\n\n"
-            "<b>✅ Мытьё головы</b>\n"
-            "Мой голову наклонив вперёд, без круговых движений. "
-            "Шампунь наноси только на корни, кондиционер — только на длину (не на капсулы).\n\n"
-            "<b>✅ Средства</b>\n"
-            "Используй безсульфатный шампунь и питательный кондиционер. "
-            "Никаких масел у корней и на капсулах!\n\n"
-            "<b>✅ Сон</b>\n"
-            "Перед сном заплетай в свободную косу или убирай в хвост. "
-            "Никогда не ложись спать с мокрыми волосами!\n\n"
-            "<b>✅ Укладка</b>\n"
-            "Утюжок и фен — только на средних температурах. "
-            "Используй термозащиту перед любой термообработкой.\n\n"
-            "<b>🚫 Стоп-лист</b>\n"
-            "• Масла и сыворотки у корней\n"
-            "• Расчёсывание мокрых волос\n"
-            "• Сон без косы/хвоста\n"
-            "• Горячая вода при мытье\n"
-            "• Дешёвые шампуни с сульфатами\n\n"
-            "<b>✨ Лайфхак для долгой носки</b>\n"
-            "Делай коррекцию вовремя (раз в 2-3 месяца) — это главный секрет! "
-            "Я сама напомню когда придёт время 💜\n\n"
-            "По всем вопросам пиши в боте или Instagram @volos_capsula"
+        GUIDE_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Секреты_долгой_носки_наращивания.pdf")
+        caption = (
+            "💜 <b>Твой персональный гайд готов!</b>\n\n"
+            "«Секреты долгой носки наращивания» — всё, что нужно знать "
+            "для красоты волос до следующей коррекции.\n\n"
+            "📌 Сохрани и возвращайся когда нужно!\n\n"
+            "По любым вопросам — всегда на связи 💜\n"
+            "Instagram: @volos_capsula"
         )
         try:
-            await bot.send_message(uid, guide_text, reply_markup=InlineKeyboardBuilder().row(
-                InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
-            ).as_markup())
-            await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд отправлен!")
+            from aiogram.types import FSInputFile
+            pdf = FSInputFile(GUIDE_PDF, filename="Секреты_долгой_носки_наращивания.pdf")
+            await bot.send_document(uid, document=pdf, caption=caption,
+                reply_markup=InlineKeyboardBuilder().row(
+                    InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
+                ).as_markup())
+            await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд (PDF) отправлен!")
             await cb.answer("Гайд отправлен ✅")
+        except FileNotFoundError:
+            await cb.answer("❌ Файл не найден на сервере!", show_alert=True)
         except Exception as e:
             await cb.answer(f"Ошибка: {e}", show_alert=True)
 
