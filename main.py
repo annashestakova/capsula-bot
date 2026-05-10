@@ -24,14 +24,15 @@ INSTAGRAM = "https://www.instagram.com/volos_capsula/"
 PHONE = os.environ.get("MASTER_PHONE","+375291234567")
 CARD = os.environ.get("CARD_NUMBER","0000 0000 0000 0000")
 
-# Длительность услуг в слотах по 30 минут
+GUIDE_URL = "https://github.com/annashestakova/capsula-bot/raw/main/%D0%A1%D0%B5%D0%BA%D1%80%D0%B5%D1%82%D1%8B_%D0%B4%D0%BE%D0%BB%D0%B3%D0%BE%D0%B9_%D0%BD%D0%BE%D1%81%D0%BA%D0%B8_%D0%BD%D0%B0%D1%80%D0%B0%D1%89%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F.pdf"
+
 SERVICE_DURATION = {
-    "Снятие капсул":       2,   # 1 час
-    "Снятие биопротеина":  3,   # 1.5 часа
-    "Загущение":           5,   # 2.5 часа
-    "Наращивание":         9,   # 4.5 часа
-    "Биопротеиновое":      6,   # 3 часа
-    "Коррекция":           4,   # 2 часа
+    "Снятие капсул":       2,
+    "Снятие биопротеина":  3,
+    "Загущение":           5,
+    "Наращивание":         9,
+    "Биопротеиновое":      6,
+    "Коррекция":           4,
 }
 
 SERVICE_PRICES = {
@@ -53,11 +54,10 @@ SERVICE_HOURS = {
 }
 
 YANDEX_MAPS_URL = os.environ.get("YANDEX_MAPS_URL", "https://yandex.by/maps/org/u_anny/90436287873/reviews/?ll=23.678135%2C52.105687&z=15")
-NEW_CLIENT_DISCOUNT = 20  # % скидка новым клиентам
+NEW_CLIENT_DISCOUNT = 20
 
 HAIR_PRICES = {45:734,50:765,55:795,60:858,65:920,70:966,75:1059,80:1121}
 
-# Хранилище
 bookings: dict = {}
 blocked_dates: set = set()
 clients: dict = {}
@@ -98,11 +98,10 @@ DAY_RU = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
 MONTH_RU = ["","янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"]
 
 def get_work_slots(d: date) -> list[str]:
-    """Возвращает все рабочие слоты для дня."""
-    if d.weekday() >= 5:  # выходные
-        start, end = 11*2, 23*2  # 11:00-23:00
-    else:  # будни
-        start, end = 18*2, 23*2  # 18:00-23:00
+    if d.weekday() >= 5:
+        start, end = 11*2, 23*2
+    else:
+        start, end = 18*2, 23*2
     slots = []
     for i in range(start, end):
         h, m = divmod(i * 30, 60)
@@ -110,7 +109,6 @@ def get_work_slots(d: date) -> list[str]:
     return slots
 
 def get_booked_slots(ds: str) -> set[str]:
-    """Возвращает занятые слоты для дня."""
     occupied = set()
     for key, bk in bookings.items():
         if key.startswith(ds) and bk["status"] != "cancelled":
@@ -125,7 +123,6 @@ def get_booked_slots(ds: str) -> set[str]:
     return occupied
 
 def get_free_slots(d: date, service: str) -> list[str]:
-    """Свободные слоты с учётом длительности услуги."""
     ds = d.strftime("%Y-%m-%d")
     if ds in blocked_dates:
         return []
@@ -134,7 +131,6 @@ def get_free_slots(d: date, service: str) -> list[str]:
     dur = SERVICE_DURATION.get(service, 2)
     free = []
     for i, slot in enumerate(all_slots):
-        # Проверяем что все нужные слоты свободны
         need = all_slots[i:i+dur]
         if len(need) == dur and not any(s in occupied for s in need):
             free.append(slot)
@@ -144,36 +140,30 @@ def get_week_start(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 def week_kb(week_start: date, service: str):
-    """Календарь на неделю."""
     b = InlineKeyboardBuilder()
-    # Заголовок недели
     ws = week_start
     we = ws + timedelta(days=6)
     b.row(InlineKeyboardButton(
         text=f"📅 {ws.day} {MONTH_RU[ws.month]} — {we.day} {MONTH_RU[we.month]}",
         callback_data="noop"
     ))
-    # Дни недели
     btns = []
     today = date.today()
     for i in range(7):
         d = ws + timedelta(days=i)
         if d <= today or d.strftime("%Y-%m-%d") in blocked_dates:
-            btns.append(InlineKeyboardButton(text=f"✗", callback_data="noop"))
+            btns.append(InlineKeyboardButton(text="✗", callback_data="noop"))
             continue
         free = get_free_slots(d, service)
         if not free:
-            btns.append(InlineKeyboardButton(text=f"✗", callback_data="noop"))
+            btns.append(InlineKeyboardButton(text="✗", callback_data="noop"))
         else:
-            label = f"{DAY_RU[i]}\n{d.day}"
             btns.append(InlineKeyboardButton(
                 text=f"{DAY_RU[i]} {d.day} ({len(free)})",
                 callback_data=f"cal_{d.strftime('%Y-%m-%d')}"
             ))
-    # Раскладываем по 4
     for i in range(0, len(btns), 4):
         b.row(*btns[i:i+4])
-    # Навигация
     prev = week_start - timedelta(days=7)
     next_ = week_start + timedelta(days=7)
     nav = []
@@ -302,7 +292,6 @@ async def notify_admin(bot, text, kb=None):
         except Exception as e: logger.error(f"Admin: {e}")
 
 async def ask_claude(q, history):
-    # Пробуем Groq сначала, потом Claude
     groq_key = GROQ_API_KEY
     if groq_key:
         try:
@@ -348,19 +337,13 @@ async def main():
 
     async def send_reminders():
         now = datetime.now()
-
-        # Напоминание Анне отправить запрос на отзыв — через 24ч после процедуры
         yesterday_ds = (now - timedelta(hours=24)).strftime("%Y-%m-%d")
         for key, bk in list(bookings.items()):
             ds = key.split("_")[0]
             if ds == yesterday_ds and bk["status"] == "confirmed" and not bk.get("review_reminder_sent"):
                 bookings[key]["review_reminder_sent"] = True
-                t = key.split("_", 1)[1]
                 b = InlineKeyboardBuilder()
-                b.row(InlineKeyboardButton(
-                    text="💌 Отправить запрос на отзыв",
-                    callback_data=f"send_review_{key}"
-                ))
+                b.row(InlineKeyboardButton(text="💌 Отправить запрос на отзыв", callback_data=f"send_review_{key}"))
                 await notify_admin(bot,
                     f"⭐ <b>Напоминание об отзыве!</b>\n\n"
                     f"Вчера была процедура:\n"
@@ -369,7 +352,6 @@ async def main():
                     f"Нажми кнопку чтобы отправить клиентке запрос на отзыв 👇",
                     kb=b.as_markup()
                 )
-
         remind_ds = (now + timedelta(hours=24)).strftime("%Y-%m-%d")
         for key, bk in list(bookings.items()):
             ds = key.split("_")[0]
@@ -385,7 +367,6 @@ async def main():
     scheduler.add_job(send_reminders, "interval", hours=1)
     scheduler.start()
 
-    # ── START ──────────────────────────────────────────────────────────────
     @dp.message(CommandStart())
     async def start(message: Message, state: FSMContext):
         await state.clear()
@@ -398,47 +379,31 @@ async def main():
             f"💜 Привет, <b>{name}</b>!\n\n"
             "Я — помощник мастера наращивания волос <b>Анны</b>\n"
             "📍 Брест · @volos_capsula\n\n"
-            "✨ Подберу метод · 💰 Рассчитаю · 📅 Запишу\n"            "🎁 Новым клиентам скидка 20% на первое наращивание!\n\n"
+            "✨ Подберу метод · 💰 Рассчитаю · 📅 Запишу\n"
+            "🎁 Новым клиентам скидка 20% на первое наращивание!\n\n"
             "Выбирай 👇",
             reply_markup=main_menu()
         )
 
-    @dp.callback_query(F.data.startswith("send_guide_"))
-    async def cb_send_guide(cb: CallbackQuery, bot: Bot):
-        if cb.from_user.id != ADMIN_ID: return
-        uid = int(cb.data.replace("send_guide_",""))
-        GUIDE_URL = "https://github.com/annashestakova/capsula-bot/raw/main/%D0%A1%D0%B5%D0%BA%D1%80%D0%B5%D1%82%D1%8B_%D0%B4%D0%BE%D0%BB%D0%B3%D0%BE%D0%B9_%D0%BD%D0%BE%D1%81%D0%BA%D0%B8_%D0%BD%D0%B0%D1%80%D0%B0%D1%89%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F.pdf"
-        caption = (
-            "💜 <b>Твой персональный гайд готов!</b>\n\n"
-            "«Секреты долгой носки наращивания» — всё, что нужно знать "
-            "для красоты волос до следующей коррекции.\n\n"
-            "📌 Сохрани и возвращайся когда нужно!\n\n"
-            "По любым вопросам — всегда на связи 💜\n"
-            "Instagram: @volos_capsula"
+    @dp.callback_query(F.data == "menu")
+    async def cb_menu(cb: CallbackQuery, state: FSMContext):
+        await state.clear()
+        await cb.message.edit_text(
+            f"💜 Главное меню\n\n<b>{cb.from_user.first_name or 'Красавица'}</b>, чем могу помочь?",
+            reply_markup=main_menu()
         )
-        try:
-            await bot.send_document(uid, document=GUIDE_URL, caption=caption,
-                reply_markup=InlineKeyboardBuilder().row(
-                    InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
-                ).as_markup())
-            await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд (PDF) отправлен!")
-            await cb.answer("Гайд отправлен ✅")
-        except Exception as e:
-            await cb.answer(f"Ошибка: {e}", show_alert=True)
+        await cb.answer()
 
     @dp.callback_query(F.data == "noop")
     async def cb_noop(cb: CallbackQuery):
         await cb.answer()
 
-    # ── ЗАПИСЬ СО СЛОТАМИ ─────────────────────────────────────────────────
+    # ── ЗАПИСЬ ────────────────────────────────────────────────────────────
     @dp.callback_query(F.data == "book")
     async def cb_book(cb: CallbackQuery, state: FSMContext):
         await state.clear()
         await state.set_state(BookState.choose_service)
-        await cb.message.edit_text(
-            "📅 <b>Запись на процедуру</b>\n\nВыбери услугу:",
-            reply_markup=services_book_kb()
-        )
+        await cb.message.edit_text("📅 <b>Запись на процедуру</b>\n\nВыбери услугу:", reply_markup=services_book_kb())
         await cb.answer()
 
     @dp.callback_query(BookState.choose_service, F.data.startswith("svc_"))
@@ -447,10 +412,7 @@ async def main():
         await state.update_data(service=service)
         await state.set_state(BookState.choose_date)
         ws = get_week_start(date.today() + timedelta(days=1))
-        await cb.message.edit_text(
-            f"📅 <b>{service}</b>\n\nВыбери удобный день:",
-            reply_markup=week_kb(ws, service)
-        )
+        await cb.message.edit_text(f"📅 <b>{service}</b>\n\nВыбери удобный день:", reply_markup=week_kb(ws, service))
         await cb.answer()
 
     @dp.callback_query(F.data.startswith("week_"))
@@ -459,10 +421,7 @@ async def main():
         ws = date.fromisoformat(ds)
         data = await state.get_data()
         service = data.get("service", "Наращивание")
-        await cb.message.edit_text(
-            f"📅 <b>{service}</b>\n\nВыбери удобный день:",
-            reply_markup=week_kb(ws, service)
-        )
+        await cb.message.edit_text(f"📅 <b>{service}</b>\n\nВыбери удобный день:", reply_markup=week_kb(ws, service))
         await cb.answer()
 
     @dp.callback_query(F.data.startswith("cal_"))
@@ -474,8 +433,7 @@ async def main():
         await state.set_state(BookState.choose_time)
         d = date.fromisoformat(ds)
         await cb.message.edit_text(
-            f"📅 <b>{d.day} {MONTH_RU[d.month]}, {DAY_RU[d.weekday()]}</b>\n"
-            f"✨ {service}\n\nВыбери время начала:",
+            f"📅 <b>{d.day} {MONTH_RU[d.month]}, {DAY_RU[d.weekday()]}</b>\n✨ {service}\n\nВыбери время начала:",
             reply_markup=times_kb(ds, service)
         )
         await cb.answer()
@@ -486,7 +444,6 @@ async def main():
         ds, t = parts[1], parts[2]
         data = await state.get_data()
         service = data.get("service", "Наращивание")
-        # Проверяем что слоты ещё свободны
         d = date.fromisoformat(ds)
         free = get_free_slots(d, service)
         if t not in free:
@@ -506,10 +463,7 @@ async def main():
         await state.set_state(BookState.enter_phone)
         b = InlineKeyboardBuilder()
         b.row(InlineKeyboardButton(text="📱 Написать через Telegram", callback_data="use_tg_contact"))
-        await message.answer(
-            "📱 Введи номер телефона\n\nИли нажми кнопку — и Анна напишет тебе в Telegram 👇",
-            reply_markup=b.as_markup()
-        )
+        await message.answer("📱 Введи номер телефона\n\nИли нажми кнопку — и Анна напишет тебе в Telegram 👇", reply_markup=b.as_markup())
 
     @dp.callback_query(BookState.enter_phone, F.data == "use_tg_contact")
     async def cb_use_tg(cb: CallbackQuery, state: FSMContext):
@@ -527,13 +481,8 @@ async def main():
             end_t = "—"
         await state.set_state(BookState.confirm)
         await cb.message.edit_text(
-            f"📋 <b>Проверь заявку:</b>\n\n"
-            f"📅 {data.get('date','')}\n"
-            f"🕐 {t} – {end_t}\n"
-            f"✨ {data.get('service','')}\n"
-            f"👤 {data.get('name','')}\n"
-            f"📱 {tg}\n\n"
-            "Всё верно?",
+            f"📋 <b>Проверь заявку:</b>\n\n📅 {data.get('date','')}\n🕐 {t} – {end_t}\n"
+            f"✨ {data.get('service','')}\n👤 {data.get('name','')}\n📱 {tg}\n\nВсё верно?",
             reply_markup=confirm_kb(data.get('date',''), t, data.get('service',''))
         )
         await cb.answer()
@@ -552,13 +501,8 @@ async def main():
         eh, em = divmod(end_m, 60)
         await state.set_state(BookState.confirm)
         await message.answer(
-            f"📋 <b>Проверь заявку:</b>\n\n"
-            f"📅 {data['date']}\n"
-            f"🕐 {data['time']} – {eh:02d}:{em:02d}\n"
-            f"✨ {data['service']}\n"
-            f"👤 {data['name']}\n"
-            f"📱 {data['phone']}\n\n"
-            "Всё верно?",
+            f"📋 <b>Проверь заявку:</b>\n\n📅 {data['date']}\n🕐 {data['time']} – {eh:02d}:{em:02d}\n"
+            f"✨ {data['service']}\n👤 {data['name']}\n📱 {data['phone']}\n\nВсё верно?",
             reply_markup=confirm_kb(data['date'], data['time'], data['service'])
         )
 
@@ -581,17 +525,13 @@ async def main():
         end_m = h*60 + m + dur*30
         eh, em = divmod(end_m, 60)
         await notify_admin(bot,
-            f"🆕 <b>Новая заявка!</b>\n\n"
-            f"📅 {ds}\n🕐 {t}–{eh:02d}:{em:02d}\n"
-            f"✨ {data['service']}\n"
-            f"👤 {data['name']}\n📱 {data['phone']}\n"
+            f"🆕 <b>Новая заявка!</b>\n\n📅 {ds}\n🕐 {t}–{eh:02d}:{em:02d}\n"
+            f"✨ {data['service']}\n👤 {data['name']}\n📱 {data['phone']}\n"
             f"🆔 @{cb.from_user.username or '—'}",
             kb=admin_booking_kb(key)
         )
         await cb.message.edit_text(
-            f"🎉 <b>Заявка отправлена!</b>\n\n"
-            f"📅 {ds} в {t}\n✨ {data['service']}\n\n"
-            "Анна свяжется для подтверждения 💜",
+            f"🎉 <b>Заявка отправлена!</b>\n\n📅 {ds} в {t}\n✨ {data['service']}\n\nАнна свяжется для подтверждения 💜",
             reply_markup=main_menu()
         )
         await cb.answer()
@@ -622,9 +562,7 @@ async def main():
             ds, t = key.split("_",1)
             bookings[key]["status"] = "cancelled"
             try:
-                await bot.send_message(uid,
-                    f"😔 Время {ds} в {t} недоступно.\n\nВыбери другое 👇",
-                    reply_markup=book_kb())
+                await bot.send_message(uid, f"😔 Время {ds} в {t} недоступно.\n\nВыбери другое 👇", reply_markup=book_kb())
             except: pass
         await cb.message.edit_text(cb.message.text + "\n\n❌ Отменено")
         await cb.answer("Клиент уведомлён ❌")
@@ -642,18 +580,15 @@ async def main():
         review_text = (
             f"💜 {name}, привет!\n\n"
             f"Прошли сутки после наращивания — как твои новые волосы? "
-            f"Надеюсь, уже успела насладиться их красотой и поймала восхищённые взгляды 😍\n\n"
-            f"Если тебе понравился результат — буду очень рада если оставишь отзыв. "
-            f"Это займёт всего 2 минуты, а для меня значит очень много 🙏\n\n"
+            f"Надеюсь, уже успела насладиться их красотой 😍\n\n"
+            f"Если понравился результат — буду очень рада отзыву. Это займёт 2 минуты 🙏\n\n"
             f"👇 Оставить отзыв на Яндекс Картах:"
         )
         b = InlineKeyboardBuilder()
         b.row(InlineKeyboardButton(text="⭐ Оставить отзыв", url=YANDEX_MAPS_URL))
         try:
             await bot.send_message(uid, review_text, reply_markup=b.as_markup())
-            await cb.message.edit_text(
-                cb.message.text + f"\n\n✅ Запрос на отзыв отправлен {name}!"
-            )
+            await cb.message.edit_text(cb.message.text + f"\n\n✅ Запрос на отзыв отправлен {name}!")
             await cb.answer("Отправлено! ✅")
         except Exception as e:
             await cb.answer(f"Ошибка: {e}", show_alert=True)
@@ -668,10 +603,8 @@ async def main():
         b.row(InlineKeyboardButton(text="✅ Открыть день", callback_data="adm_unblock"))
         b.row(InlineKeyboardButton(text="📊 Все записи", callback_data="adm_all"))
         await message.answer(
-            f"👑 <b>Админ-панель</b>\n\n"
-            f"⏳ Ожидают: <b>{len(pending)}</b>\n"
-            f"✅ Подтверждено: <b>{len(confirmed)}</b>\n"
-            f"🚫 Закрытых дней: <b>{len(blocked_dates)}</b>\n"
+            f"👑 <b>Админ-панель</b>\n\n⏳ Ожидают: <b>{len(pending)}</b>\n"
+            f"✅ Подтверждено: <b>{len(confirmed)}</b>\n🚫 Закрытых дней: <b>{len(blocked_dates)}</b>\n"
             f"👥 Клиентов: <b>{len(clients)}</b>",
             reply_markup=b.as_markup()
         )
@@ -680,9 +613,7 @@ async def main():
     async def adm_block(cb: CallbackQuery, state: FSMContext):
         if cb.from_user.id != ADMIN_ID: return
         await state.set_state(AdminState.blocking)
-        await cb.message.edit_text(
-            "🚫 Введи дату для закрытия:\n<code>ГГГГ-ММ-ДД</code>\nНапр: <code>2025-05-20</code>"
-        )
+        await cb.message.edit_text("🚫 Введи дату для закрытия:\n<code>ГГГГ-ММ-ДД</code>\nНапр: <code>2025-05-20</code>")
         await cb.answer()
 
     @dp.callback_query(F.data == "adm_unblock")
@@ -734,15 +665,9 @@ async def main():
     async def cb_services(cb: CallbackQuery):
         await cb.message.edit_text(
             "✨ <b>Услуги и цены</b>\n\n"
-            "🔥 <b>Наращивание капсульное</b>\n"
-            "  1.6 BYN/капсула + волосы (45–80 см)\n"
-            "  Время: 4–6 ч\n\n"
-            "💜 <b>Биопротеиновое</b>\n"
-            "  350–400 BYN (с волосами)\n"
-            "  +30–50 BYN за густоту\n"
-            "  Время: 2–4 ч\n\n"
-            "🎀 <b>Загущение</b>\n"
-            "  от 160 BYN · Время: 2–3 ч\n\n"
+            "🔥 <b>Наращивание капсульное</b>\n  1.6 BYN/капсула + волосы (45–80 см)\n  Время: 4–6 ч\n\n"
+            "💜 <b>Биопротеиновое</b>\n  350–400 BYN (с волосами)\n  +30–50 BYN за густоту\n  Время: 2–4 ч\n\n"
+            "🎀 <b>Загущение</b>\n  от 160 BYN · Время: 2–3 ч\n\n"
             "✂️ <b>Снятие капсул:</b> 0.4 BYN/прядь\n"
             "✂️ <b>Снятие биопротеина:</b> 50 BYN/100г\n"
             "🔄 <b>Коррекция:</b> от 80 BYN",
@@ -753,8 +678,7 @@ async def main():
     @dp.callback_query(F.data == "contacts")
     async def cb_contacts(cb: CallbackQuery):
         await cb.message.edit_text(
-            f"📞 <b>Контакты</b>\n\n👩 Мастер: <b>Анна</b>\n"
-            f"📍 Брест (адрес при записи)\n📱 {PHONE}\n📸 @volos_capsula",
+            f"📞 <b>Контакты</b>\n\n👩 Мастер: <b>Анна</b>\n📍 Брест (адрес при записи)\n📱 {PHONE}\n📸 @volos_capsula",
             reply_markup=back_kb()
         )
         await cb.answer()
@@ -789,14 +713,10 @@ async def main():
         await cb.message.edit_text(
             f"💎 <b>Гайд «Уход за нарощенными волосами»</b>\n\n"
             "Что внутри:\n"
-            "✨ Как правильно расчёсывать\n"
-            "✨ Какие средства использовать\n"
-            "✨ Как мыть голову\n"
-            "✨ Что делать перед сном\n"
-            "✨ Стоп-лист — что категорически нельзя\n"
-            "✨ Как продлить носку до максимума\n\n"
-            f"💰 Стоимость: <b>9 BYN</b>{card_text}\n\n"
-            "После перевода нажми кнопку ниже 👇",
+            "✨ Как правильно расчёсывать\n✨ Какие средства использовать\n"
+            "✨ Как мыть голову\n✨ Что делать перед сном\n"
+            "✨ Стоп-лист — что категорически нельзя\n✨ Как продлить носку до максимума\n\n"
+            f"💰 Стоимость: <b>9 BYN</b>{card_text}\n\nПосле перевода нажми кнопку ниже 👇",
             reply_markup=pay_kb("guide")
         )
         await cb.answer()
@@ -804,8 +724,7 @@ async def main():
     @dp.callback_query(F.data == "buy_consult")
     async def cb_buy_consult(cb: CallbackQuery):
         await cb.message.edit_text(
-            f"🤖 <b>ИИ-консультация</b>\n\n"
-            "✨ Подбор метода\n✨ Точная стоимость\n✨ Ответы на вопросы\n\n"
+            f"🤖 <b>ИИ-консультация</b>\n\n✨ Подбор метода\n✨ Точная стоимость\n✨ Ответы на вопросы\n\n"
             f"💰 <b>19 BYN</b>\nКарта: <code>{CARD}</code>",
             reply_markup=pay_kb("consult")
         )
@@ -816,16 +735,13 @@ async def main():
         product = cb.data.replace("paid_","")
         names = {"guide":"Гайд по уходу (9 BYN)","consult":"ИИ-консультация (19 BYN)"}
         await notify_admin(bot,
-            f"💰 <b>Новая оплата!</b>\n\n"
-            f"Продукт: {names.get(product,product)}\n"
+            f"💰 <b>Новая оплата!</b>\n\nПродукт: {names.get(product,product)}\n"
             f"👤 {cb.from_user.first_name} @{cb.from_user.username or '—'}\n"
-            f"🆔 {cb.from_user.id}\n\n"
-            f"Проверь платёж и подтверди отправку!"
+            f"🆔 {cb.from_user.id}\n\nПроверь платёж и подтверди отправку!"
         )
         if product == "guide":
             await cb.message.edit_text(
-                "⏳ Анна проверяет платёж и пришлёт гайд в течение нескольких минут 💜\n\n"
-                "Обычно это занимает 5-10 минут.",
+                "⏳ Анна проверяет платёж и пришлёт гайд в течение нескольких минут 💜\n\nОбычно это занимает 5-10 минут.",
                 reply_markup=back_kb()
             )
             b = InlineKeyboardBuilder()
@@ -835,18 +751,14 @@ async def main():
                 kb=b.as_markup()
             )
         else:
-            await cb.message.edit_text(
-                "✅ Оплата получена! Анна свяжется для начала консультации 💜",
-                reply_markup=back_kb()
-            )
+            await cb.message.edit_text("✅ Оплата получена! Анна свяжется для начала консультации 💜", reply_markup=back_kb())
         await cb.answer()
 
-    @dp.callback_query(F.data.startswith("send_guide_"))
+    # ── ОТПРАВКА ГАЙДА ────────────────────────────────────────────────────
     @dp.callback_query(F.data.startswith("send_guide_"))
     async def cb_send_guide(cb: CallbackQuery, bot: Bot):
         if cb.from_user.id != ADMIN_ID: return
         uid = int(cb.data.replace("send_guide_",""))
-        GUIDE_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Секреты_долгой_носки_наращивания.pdf")
         caption = (
             "💜 <b>Твой персональный гайд готов!</b>\n\n"
             "«Секреты долгой носки наращивания» — всё, что нужно знать "
@@ -856,16 +768,16 @@ async def main():
             "Instagram: @volos_capsula"
         )
         try:
-            from aiogram.types import FSInputFile
-            pdf = FSInputFile(GUIDE_PDF, filename="Секреты_долгой_носки_наращивания.pdf")
-            await bot.send_document(uid, document=pdf, caption=caption,
+            await bot.send_document(
+                uid,
+                document=GUIDE_URL,
+                caption=caption,
                 reply_markup=InlineKeyboardBuilder().row(
                     InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
-                ).as_markup())
+                ).as_markup()
+            )
             await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд (PDF) отправлен!")
             await cb.answer("Гайд отправлен ✅")
-        except FileNotFoundError:
-            await cb.answer("❌ Файл не найден на сервере!", show_alert=True)
         except Exception as e:
             await cb.answer(f"Ошибка: {e}", show_alert=True)
 
@@ -923,10 +835,7 @@ async def main():
     @dp.callback_query(F.data == "calc_bio")
     async def calc_bio(cb: CallbackQuery):
         await cb.message.edit_text(
-            "💜 <b>Биопротеиновое</b>\n\n"
-            "Базовая: <b>350 BYN</b> (с волосами)\n"
-            "Доплата за густоту: <b>+30–50 BYN</b>\n\n"
-            "💰 Итого: <b>350–400 BYN</b>",
+            "💜 <b>Биопротеиновое</b>\n\nБазовая: <b>350 BYN</b> (с волосами)\nДоплата за густоту: <b>+30–50 BYN</b>\n\n💰 Итого: <b>350–400 BYN</b>",
             reply_markup=book_kb()
         )
         await cb.answer()
@@ -939,9 +848,7 @@ async def main():
     @dp.callback_query(F.data == "calc_rem")
     async def calc_rem(cb: CallbackQuery):
         await cb.message.edit_text(
-            "✂️ <b>Снятие</b>\n\n"
-            "• Капсулы: 0.4 BYN/прядь (100пр = 40 BYN)\n"
-            "• Биопротеин: 50 BYN/100г",
+            "✂️ <b>Снятие</b>\n\n• Капсулы: 0.4 BYN/прядь (100пр = 40 BYN)\n• Биопротеин: 50 BYN/100г",
             reply_markup=book_kb()
         )
         await cb.answer()
@@ -998,7 +905,6 @@ async def main():
         t = message.text.lower()
         if any(w in t for w in ["цен","сколько","стоит","прайс"]):
             await message.answer("Кратко о ценах 👇", reply_markup=back_kb())
-            await cb_services.__wrapped__(message) if hasattr(cb_services,'__wrapped__') else None
         elif any(w in t for w in ["запис","прийти","время"]):
             await message.answer("📅 Выбирай удобное время 👇", reply_markup=book_kb())
         elif any(w in t for w in ["привет","здравств","добрый","hello"]):
@@ -1008,7 +914,7 @@ async def main():
             await message.answer("💜 Выбирай 👇", reply_markup=main_menu())
 
     await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("✅ Bot started — smart calendar version")
+    logger.info("✅ Bot started")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
