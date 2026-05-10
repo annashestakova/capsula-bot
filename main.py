@@ -403,14 +403,28 @@ async def main():
             reply_markup=main_menu()
         )
 
-    @dp.callback_query(F.data == "menu")
-    async def cb_menu(cb: CallbackQuery, state: FSMContext):
-        await state.clear()
-        await cb.message.edit_text(
-            f"💜 Главное меню\n\n<b>{cb.from_user.first_name or 'Красавица'}</b>, чем могу помочь?",
-            reply_markup=main_menu()
+    @dp.callback_query(F.data.startswith("send_guide_"))
+    async def cb_send_guide(cb: CallbackQuery, bot: Bot):
+        if cb.from_user.id != ADMIN_ID: return
+        uid = int(cb.data.replace("send_guide_",""))
+        GUIDE_URL = "https://github.com/annashestakova/capsula-bot/raw/main/%D0%A1%D0%B5%D0%BA%D1%80%D0%B5%D1%82%D1%8B_%D0%B4%D0%BE%D0%BB%D0%B3%D0%BE%D0%B9_%D0%BD%D0%BE%D1%81%D0%BA%D0%B8_%D0%BD%D0%B0%D1%80%D0%B0%D1%89%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F.pdf"
+        caption = (
+            "💜 <b>Твой персональный гайд готов!</b>\n\n"
+            "«Секреты долгой носки наращивания» — всё, что нужно знать "
+            "для красоты волос до следующей коррекции.\n\n"
+            "📌 Сохрани и возвращайся когда нужно!\n\n"
+            "По любым вопросам — всегда на связи 💜\n"
+            "Instagram: @volos_capsula"
         )
-        await cb.answer()
+        try:
+            await bot.send_document(uid, document=GUIDE_URL, caption=caption,
+                reply_markup=InlineKeyboardBuilder().row(
+                    InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
+                ).as_markup())
+            await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд (PDF) отправлен!")
+            await cb.answer("Гайд отправлен ✅")
+        except Exception as e:
+            await cb.answer(f"Ошибка: {e}", show_alert=True)
 
     @dp.callback_query(F.data == "noop")
     async def cb_noop(cb: CallbackQuery):
