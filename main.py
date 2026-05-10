@@ -490,7 +490,39 @@ async def main():
             return
         await state.update_data(name=message.text.strip())
         await state.set_state(BookState.enter_phone)
-        await message.answer("📱 Номер телефона:")
+        b = InlineKeyboardBuilder()
+        b.row(InlineKeyboardButton(text="📱 Написать через Telegram", callback_data="use_tg_contact"))
+        await message.answer(
+            "📱 Введи номер телефона\n\nИли нажми кнопку — и Анна напишет тебе в Telegram 👇",
+            reply_markup=b.as_markup()
+        )
+
+    @dp.callback_query(BookState.enter_phone, F.data == "use_tg_contact")
+    async def cb_use_tg(cb: CallbackQuery, state: FSMContext):
+        tg = f"@{cb.from_user.username}" if cb.from_user.username else f"ID: {cb.from_user.id}"
+        await state.update_data(phone=tg)
+        data = await state.get_data()
+        dur = SERVICE_DURATION.get(data.get('service',''), 2)
+        t = data.get('time','')
+        if t:
+            h, m = map(int, t.split(":"))
+            end_m = h*60 + m + dur*30
+            eh, em = divmod(end_m, 60)
+            end_t = f"{eh:02d}:{em:02d}"
+        else:
+            end_t = "—"
+        await state.set_state(BookState.confirm)
+        await cb.message.edit_text(
+            f"📋 <b>Проверь заявку:</b>\n\n"
+            f"📅 {data.get('date','')}\n"
+            f"🕐 {t} – {end_t}\n"
+            f"✨ {data.get('service','')}\n"
+            f"👤 {data.get('name','')}\n"
+            f"📱 {tg}\n\n"
+            "Всё верно?",
+            reply_markup=confirm_kb(data.get('date',''), t, data.get('service',''))
+        )
+        await cb.answer()
 
     @dp.message(BookState.enter_phone, F.text)
     async def book_phone(message: Message, state: FSMContext):
@@ -739,12 +771,18 @@ async def main():
 
     @dp.callback_query(F.data == "buy_guide")
     async def cb_buy_guide(cb: CallbackQuery):
+        card_text = f"\n\n💳 Перевод на карту: <code>{CARD}</code>" if CARD and CARD != "0000 0000 0000 0000" else f"\n\n📱 Напишите для оплаты: {PHONE}"
         await cb.message.edit_text(
-            f"💎 <b>Гайд «Уход за нарощенными»</b>\n\n"
-            "✨ Как расчёсывать\n✨ Какие средства\n"
-            "✨ Как мыть голову\n✨ Что делать перед сном\n"
-            "✨ Стоп-лист\n\n"
-            f"💰 <b>9 BYN</b>\nКарта: <code>{CARD}</code>\n\nПосле оплаты нажми 👇",
+            f"💎 <b>Гайд «Уход за нарощенными волосами»</b>\n\n"
+            "Что внутри:\n"
+            "✨ Как правильно расчёсывать\n"
+            "✨ Какие средства использовать\n"
+            "✨ Как мыть голову\n"
+            "✨ Что делать перед сном\n"
+            "✨ Стоп-лист — что категорически нельзя\n"
+            "✨ Как продлить носку до максимума\n\n"
+            f"💰 Стоимость: <b>9 BYN</b>{card_text}\n\n"
+            "После перевода нажми кнопку ниже 👇",
             reply_markup=pay_kb("guide")
         )
         await cb.answer()
@@ -762,16 +800,74 @@ async def main():
     @dp.callback_query(F.data.startswith("paid_"))
     async def cb_paid(cb: CallbackQuery, bot: Bot):
         product = cb.data.replace("paid_","")
-        names = {"guide":"Гайд (9 BYN)","consult":"Консультация (19 BYN)"}
+        names = {"guide":"Гайд по уходу (9 BYN)","consult":"ИИ-консультация (19 BYN)"}
         await notify_admin(bot,
-            f"💰 <b>Оплата!</b>\n{names.get(product,product)}\n"
-            f"👤 {cb.from_user.first_name} @{cb.from_user.username or '—'}\n🆔 {cb.from_user.id}"
+            f"💰 <b>Новая оплата!</b>\n\n"
+            f"Продукт: {names.get(product,product)}\n"
+            f"👤 {cb.from_user.first_name} @{cb.from_user.username or '—'}\n"
+            f"🆔 {cb.from_user.id}\n\n"
+            f"Проверь платёж и подтверди отправку!"
         )
-        await cb.message.edit_text(
-            "✅ Анна проверит платёж и пришлёт материал в течение нескольких минут 💜",
-            reply_markup=back_kb()
-        )
+        if product == "guide":
+            await cb.message.edit_text(
+                "⏳ Анна проверяет платёж и пришлёт гайд в течение нескольких минут 💜\n\n"
+                "Обычно это занимает 5-10 минут.",
+                reply_markup=back_kb()
+            )
+            b = InlineKeyboardBuilder()
+            b.row(InlineKeyboardButton(text="✅ Отправить гайд клиентке", callback_data=f"send_guide_{cb.from_user.id}"))
+            await notify_admin(bot,
+                f"📖 Нажми чтобы отправить гайд клиентке @{cb.from_user.username or cb.from_user.id}",
+                kb=b.as_markup()
+            )
+        else:
+            await cb.message.edit_text(
+                "✅ Оплата получена! Анна свяжется для начала консультации 💜",
+                reply_markup=back_kb()
+            )
         await cb.answer()
+
+    @dp.callback_query(F.data.startswith("send_guide_"))
+    async def cb_send_guide(cb: CallbackQuery, bot: Bot):
+        if cb.from_user.id != ADMIN_ID: return
+        uid = int(cb.data.replace("send_guide_",""))
+        guide_text = (
+            "💎 <b>Гайд по уходу за нарощенными волосами</b>\n\n"
+            "Благодарю за покупку! 💜 Вот твой гайд:\n\n"
+            "<b>✅ Расчёсывание</b>\n"
+            "Расчёсывай только специальной щёткой для нарощенных снизу вверх. "
+            "Никогда не тяни от корней!\n\n"
+            "<b>✅ Мытьё головы</b>\n"
+            "Мой голову наклонив вперёд, без круговых движений. "
+            "Шампунь наноси только на корни, кондиционер — только на длину (не на капсулы).\n\n"
+            "<b>✅ Средства</b>\n"
+            "Используй безсульфатный шампунь и питательный кондиционер. "
+            "Никаких масел у корней и на капсулах!\n\n"
+            "<b>✅ Сон</b>\n"
+            "Перед сном заплетай в свободную косу или убирай в хвост. "
+            "Никогда не ложись спать с мокрыми волосами!\n\n"
+            "<b>✅ Укладка</b>\n"
+            "Утюжок и фен — только на средних температурах. "
+            "Используй термозащиту перед любой термообработкой.\n\n"
+            "<b>🚫 Стоп-лист</b>\n"
+            "• Масла и сыворотки у корней\n"
+            "• Расчёсывание мокрых волос\n"
+            "• Сон без косы/хвоста\n"
+            "• Горячая вода при мытье\n"
+            "• Дешёвые шампуни с сульфатами\n\n"
+            "<b>✨ Лайфхак для долгой носки</b>\n"
+            "Делай коррекцию вовремя (раз в 2-3 месяца) — это главный секрет! "
+            "Я сама напомню когда придёт время 💜\n\n"
+            "По всем вопросам пиши в боте или Instagram @volos_capsula"
+        )
+        try:
+            await bot.send_message(uid, guide_text, reply_markup=InlineKeyboardBuilder().row(
+                InlineKeyboardButton(text="📅 Записаться на коррекцию", callback_data="book")
+            ).as_markup())
+            await cb.message.edit_text(cb.message.text + "\n\n✅ Гайд отправлен!")
+            await cb.answer("Гайд отправлен ✅")
+        except Exception as e:
+            await cb.answer(f"Ошибка: {e}", show_alert=True)
 
     # ── КВИЗ ──────────────────────────────────────────────────────────────
     @dp.callback_query(F.data == "quiz")
