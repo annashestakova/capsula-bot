@@ -57,40 +57,58 @@ YANDEX_MAPS_URL = os.environ.get("YANDEX_MAPS_URL", "https://yandex.by/maps/org/
 NEW_CLIENT_DISCOUNT = 20
 
 HAIR_PRICES = {45:734,50:765,55:795,60:858,65:920,70:966,75:1059,80:1121}
+# Цена за 1 грамм = HAIR_PRICES[длина] / 100
+# Доплата +30 BYN за каждые следующие 100г
 
 bookings: dict = {}
 blocked_dates: set = set()
 clients: dict = {}
 
 AI_SYSTEM = """Ты — помощник мастера по наращиванию волос Анны (@volos_capsula, Брест).
-Отвечай тепло, по-русски, кратко (2-4 предложения). Никогда не добавляй услуги которые клиент не просил.
+Отвечай тепло, по-русски, чётко. Никогда не добавляй услуги которые клиент не просил.
 
-ПРАВИЛА РАСЧЁТА:
+═══ ПРАЙС НА РАБОТУ ═══
+Капсульное наращивание: 1.6 BYN за 1 капсулу
+Снятие капсул: 0.4 BYN за 1 прядь
+Снятие биопротеина: 50 BYN/100г
+Коррекция: от 80 BYN
+Биопротеиновое: 350–400 BYN (волосы включены)
+Распутывание колтунов: 50 BYN/час
 
-1. КАПСУЛЬНОЕ НАРАЩИВАНИЕ (славянский натуральный волос):
-   - Работа: кол-во капсул × 1.6 BYN
-   - Волосы (только натуральные славянские, цена с наценкой):
-     45см = 734 BYN, 50см = 765, 55см = 795, 60см = 858,
-     65см = 920, 70см = 966, 75см = 1059, 80см = 1121
-   - ИТОГО = работа + волосы
-   - Рекомендации по количеству капсул:
-     Тонкие волосы: от 200 капсул
-     Средние волосы: от 270 капсул
-     Густые волосы: от 450 капсул
-   - Если не спрашивают про волосы — называй только стоимость работы
-   - Если спрашивают общую стоимость — уточни густоту волос и нужна ли длина
+═══ ЦЕНА ВОЛОС (за 100г натуральный славянский) ═══
+45 см = 734 BYN | 50 см = 765 | 55 см = 795 | 60 см = 858
+65 см = 920 | 70 см = 966 | 75 см = 1059 | 80 см = 1121
+Дополнительная наценка: +30 BYN за каждые 100г свыше первых 100г
 
-2. БИОПРОТЕИНОВОЕ: 350-400 BYN (волосы включены). Доплата за густоту +30-50 BYN.
+Цена за 1г = цена за 100г ÷ 100
 
-3. ЛЕНТОЧНОЕ (биоленты): от 200 BYN. Время 40-90 мин.
+═══ КОЛИЧЕСТВО КАПСУЛ ═══
+ЗАГУЩЕНИЕ:
+- Височные зоны: 50–100 капсул (~30–50г волос)
+- Полное загущение: 130–170 капсул (~50–70г волос)
 
-4. СНЯТИЕ: капсулы 0.4 BYN/прядь, биопротеин 50 BYN/100г.
+УДЛИНЕНИЕ/НАРАЩИВАНИЕ:
+- Негустые (тонкие) волосы: 150–250 капсул (~80–120г волос)
+- Средние волосы: 250–300 капсул (~120–150г волос)
+- Густые волосы: от 300 капсул (~150–200г волос)
 
-5. КОРРЕКЦИЯ: от 80 BYN.
+═══ КАК СЧИТАТЬ ═══
+1. Определи тип: загущение или удлинение
+2. Определи густоту волос клиента
+3. Возьми среднее кол-во капсул из диапазона
+4. Работа = капсулы × 1.6 BYN
+5. Волосы = (граммы ÷ 100) × цена за 100г + доплата если >100г
+6. ИТОГО = работа + волосы
+
+ПРИМЕР расчёта (средние волосы, удлинение, 60 см):
+- Капсул: 270 шт → работа: 270 × 1.6 = 432 BYN
+- Волос: ~130г → (130 ÷ 100) × 858 = 1115 BYN
+- ИТОГО: 432 + 1115 = 1547 BYN
 
 ВАЖНО:
+- Всегда указывай что расчёт примерный — точный после осмотра
+- Уточняй: загущение или удлинение? густота? желаемая длина?
 - Не добавляй снятие и коррекцию если не спросили
-- При вопросе о стоимости капсульного — уточни: густота волос (тонкие/средние/густые) и нужна ли длина
 - Запись только через кнопку в боте
 - Волосы только натуральные славянские"""
 
@@ -710,11 +728,13 @@ async def main():
             "Это лишь верхушка айсберга 👆\n\n"
             "💎 <b>В полном гайде (9 BYN):</b>\n"
             "✅ Пошаговый уход на каждый день\n"
-            "✅ Какие средства реально работают (HADAT, TIGI, L'Oréal)\n"
-            "✅ Стоп-лист — 8 вещей которые убивают наращивание\n"
+            "✅ Реальные средства которые я использую сама\n"
+            "   (HADAT, TIGI After Party, L'Oréal — с объяснением зачем)\n"
+            "✅ Стоп-лист: 8 вещей которые убивают наращивание\n"
             "✅ Лайфхаки которых нет в интернете\n"
-            "✅ График ухода по неделям до коррекции\n\n"
-            "Клиентки которые следуют гайду носят наращивание 4+ месяца 💜\n\n"
+            "✅ График ухода по неделям до коррекции\n"
+            "✅ Эксклюзив: себестоимость волос и как не переплатить\n\n"
+            "📌 <i>Клиентки которые следуют гайду носят наращивание 4+ месяца</i>\n\n"
             "👇 Хочешь такой же результат?",
             reply_markup=b.as_markup()
         )
@@ -869,20 +889,105 @@ async def main():
     @dp.callback_query(F.data == "calc_cap")
     async def calc_cap(cb: CallbackQuery):
         b = InlineKeyboardBuilder()
-        for n in [80,100,120,150,200]:
-            b.button(text=f"{n}кап={round(n*1.6,1)}р", callback_data=f"cap_{n}")
-        b.adjust(2)
+        b.row(InlineKeyboardButton(text="🎀 Загущение височных зон", callback_data="cap_type_zag_vis"))
+        b.row(InlineKeyboardButton(text="🎀 Загущение полное", callback_data="cap_type_zag_full"))
+        b.row(InlineKeyboardButton(text="✨ Удлинение — тонкие волосы", callback_data="cap_type_len_thin"))
+        b.row(InlineKeyboardButton(text="✨ Удлинение — средние волосы", callback_data="cap_type_len_mid"))
+        b.row(InlineKeyboardButton(text="✨ Удлинение — густые волосы", callback_data="cap_type_len_thick"))
         b.row(InlineKeyboardButton(text="← Назад", callback_data="calc"))
-        await cb.message.edit_text("🔥 <b>Капсульное — 1.6 BYN/капсула</b>", reply_markup=b.as_markup())
+        await cb.message.edit_text(
+            "🔥 <b>Капсульное наращивание</b>\n\n"
+            "Работа: <b>1.6 BYN/капсула</b>\n"
+            "Волосы: натуральный славянский, цена зависит от длины\n\n"
+            "Выбери тип процедуры для расчёта 👇",
+            reply_markup=b.as_markup()
+        )
         await cb.answer()
 
-    @dp.callback_query(F.data.startswith("cap_"))
-    async def cap_res(cb: CallbackQuery):
-        n = int(cb.data.split("_")[1])
-        w = round(n*1.6,1)
-        lines = "\n".join(f"• {l}см → {w+p:.0f} BYN" for l,p in HAIR_PRICES.items())
+    @dp.callback_query(F.data.startswith("cap_type_"))
+    async def cap_type(cb: CallbackQuery):
+        t = cb.data.replace("cap_type_", "")
+        types = {
+            "zag_vis":   ("Загущение височных зон", 50, 100, 30, 50),
+            "zag_full":  ("Загущение полное",       130, 170, 50, 70),
+            "len_thin":  ("Удлинение, тонкие волосы", 150, 250, 80, 120),
+            "len_mid":   ("Удлинение, средние волосы", 250, 300, 120, 150),
+            "len_thick": ("Удлинение, густые волосы",  300, 380, 150, 200),
+        }
+        name, cap_min, cap_max, g_min, g_max = types[t]
+        cap_avg = (cap_min + cap_max) // 2
+        g_avg = (g_min + g_max) // 2
+        work = round(cap_avg * 1.6, 1)
+
+        b = InlineKeyboardBuilder()
+        for length, price_100g in HAIR_PRICES.items():
+            price_per_g = price_100g / 100
+            hair_cost = round(price_per_g * g_avg)
+            if g_avg > 100:
+                extra = ((g_avg - 100) // 100) * 30
+                hair_cost += extra
+            total = work + hair_cost
+            b.button(
+                text=f"{length}см → {total:.0f}р",
+                callback_data=f"cap_detail_{t}_{length}"
+            )
+        b.adjust(2)
+        b.row(InlineKeyboardButton(text="← Назад", callback_data="calc_cap"))
+
         await cb.message.edit_text(
-            f"🔥 <b>{n} капсул</b>\nРабота: <b>{w} BYN</b>\n\n<b>С волосами:</b>\n{lines}",
+            f"✨ <b>{name}</b>\n\n"
+            f"📌 Капсул: <b>{cap_min}–{cap_max} шт</b> (в среднем {cap_avg})\n"
+            f"📌 Волос: <b>{g_min}–{g_max}г</b> (в среднем {g_avg}г)\n"
+            f"📌 Работа: <b>{work} BYN</b>\n\n"
+            f"<b>Итого с волосами по длине:</b>",
+            reply_markup=b.as_markup()
+        )
+        await cb.answer()
+
+    @dp.callback_query(F.data.startswith("cap_detail_"))
+    async def cap_detail(cb: CallbackQuery):
+        parts = cb.data.replace("cap_detail_", "").rsplit("_", 1)
+        t, length = parts[0], int(parts[1])
+        types = {
+            "zag_vis":   ("Загущение височных зон", 50, 100, 30, 50),
+            "zag_full":  ("Загущение полное",       130, 170, 50, 70),
+            "len_thin":  ("Удлинение, тонкие волосы", 150, 250, 80, 120),
+            "len_mid":   ("Удлинение, средние волосы", 250, 300, 120, 150),
+            "len_thick": ("Удлинение, густые волосы",  300, 380, 150, 200),
+        }
+        name, cap_min, cap_max, g_min, g_max = types[t]
+        cap_avg = (cap_min + cap_max) // 2
+        g_avg = (g_min + g_max) // 2
+        price_100g = HAIR_PRICES[length]
+        price_per_g = price_100g / 100
+
+        work_min = round(cap_min * 1.6, 1)
+        work_max = round(cap_max * 1.6, 1)
+        work_avg = round(cap_avg * 1.6, 1)
+
+        hair_min = round(price_per_g * g_min)
+        hair_max = round(price_per_g * g_max)
+        if g_min > 100:
+            hair_min += ((g_min - 100) // 100) * 30
+        if g_max > 100:
+            hair_max += ((g_max - 100) // 100) * 30
+
+        total_min = work_min + hair_min
+        total_max = work_max + hair_max
+
+        await cb.message.edit_text(
+            f"🔥 <b>{name}</b>\n"
+            f"📏 Длина волос: <b>{length} см</b>\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"💇 Капсул: <b>{cap_min}–{cap_max} шт</b>\n"
+            f"💰 Работа: <b>{work_min}–{work_max} BYN</b>\n\n"
+            f"🦱 Волос: <b>{g_min}–{g_max}г</b>\n"
+            f"💰 Волосы: <b>{hair_min}–{hair_max} BYN</b>\n"
+            f"   (цена за 100г = {price_100g} BYN)\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"💜 <b>ИТОГО: {total_min:.0f}–{total_max:.0f} BYN</b>\n\n"
+            f"⚠️ Точный расчёт — после осмотра волос.\n"
+            f"Запишись на бесплатную консультацию 👇",
             reply_markup=book_kb()
         )
         await cb.answer()
