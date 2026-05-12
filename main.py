@@ -990,6 +990,20 @@ async def main():
             f"Запишись на бесплатную консультацию 👇",
             reply_markup=book_kb()
         )
+        promo = f"НОВАЯ-{cb.from_user.id}"
+        await cb.message.answer(
+            f"🎁 <b>Подарок от мастера Анны!</b>\n\n"
+            f"Скидка <b>30 BYN</b> на первое наращивание специально для тебя\n\n"
+            f"🎟 Твой персональный купон:\n"
+            f"<code>{promo}</code>\n\n"
+            f"✅ Назови код при записи\n"
+            f"✅ Действует 30 дней\n"
+            f"✅ Только для новых клиентов\n\n"
+            f"📍 Брест · @volos_capsula",
+            reply_markup=InlineKeyboardBuilder().row(
+                InlineKeyboardButton(text="📅 Записаться со скидкой", callback_data="book")
+            ).as_markup()
+        )
         await cb.answer()
 
     # ── ИИ ────────────────────────────────────────────────────────────────
